@@ -1,0 +1,1433 @@
+﻿Knowledge Distillation in RNN-Attention Models for Early Prediction of Student Performance
+  
+Sukrit Leelaluk
+Kyushu University
+Graduate School of Information Science and Electrical
+Engineering
+Fukuoka, Japan leelaluksukrit@gmail.com
+Cheng Tang
+Kyushu University
+Faculty of Information Science and Electrical Engineering
+Fukuoka, Japan tang@ait.kyushu-u.ac.jp
+  
+Valdemar ?vbensk?
+Kyushu University
+Faculty of Information Science and Electrical Engineering
+Fukuoka, Japan valdemar.research@gmail.com
+Atsushi Shimada
+Kyushu University
+Faculty of Information Science and Electrical Engineering
+Fukuoka, Japan atsushi@ait.kyushu-u.ac.jp
+  
+Abstract
+Educational data mining (EDM) is a part of applied computing that focuses on automatically analyzing data from learning contexts. Early prediction for identifying at-risk students is a crucial and widely researched topic in EDM research. It enables instructors to support at-risk students to stay on track, preventing student dropout or failure. Previous studies have predicted studentsՠlearning performance to identify at-risk students by using machine learning on data collected from e-learning platforms. However, most studies aimed to identify at-risk students utilizing the entire course data after the course finished. This does not correspond to the realworld scenario that at-risk students may drop out before the course ends. To address this problem, we introduce an RNN-AttentionKD (knowledge distillation) framework to predict at-risk students early throughout a course. It leverages the strengths of Recurrent Neural Networks (RNNs) in handling time-sequence data to predict studentsՠperformance at each time step and employs an attention mechanism to focus on relevant time steps for improved predictive accuracy. At the same time, KD is applied to compress the time steps to facilitate early prediction. In an empirical evaluation, RNNAttention-KD outperforms traditional neural network models in terms of recall and F1-measure. For example, it obtained recall and F1-measure of 0.49 and 0.51 for Weeks 1г and 0.51 and 0.61 for
+Weeks 1ж across all datasets from four years of a university course. Then, an ablation study investigated the contributions of different knowledge transfer methods (distillation objectives). We found that hint loss from the hidden layer of RNN and context vector loss from the attention module on RNN could enhance the modelճ prediction performance for identifying at-risk students. These results are relevant for EDM researchers employing deep learning models.
+
+Permission to make digital or hard copies of all or part of this work for personal or classroom use is granted without fee provided that copies are not made or distributed for profit or commercial advantage and that copies bear this notice and the full citation on the first page. Copyrights for components of this work owned by others than the author(s) must be honored. Abstracting with credit is permitted. To copy otherwise, or republish, to post on servers or to redistribute to lists, requires prior specific permission and/or a fee. Request permissions from permissions@acm.org.
+SAC ղ5, March 31-April 4, 2025, Catania, Italy
+ 2025 Copyright held by the owner/author(s). Publication rights licensed to ACM.
+ACM ISBN 979-8-4007-0629-5/25/03 https://doi.org/10.1145/3672608.3707805
+CCS Concepts
+ Computing methodologies ? Machine learning;  Applied computing ? Education.
+Keywords
+Student Performance Prediction, Educational Data Mining, Learning Analytics, Knowledge Distillation, Neural Network
+ACM Reference Format:
+Sukrit Leelaluk, Cheng Tang, Valdemar ?vbensk?, and Atsushi Shimada. 2025. Knowledge Distillation in RNN-Attention Models for Early Prediction of Student Performance. In The 40th ACM/SIGAPP Symposium on Applied Computing (SAC ղ5), March 31-April 4, 2025, Catania, Italy. ACM, New York,
+NY, USA, 10 pages. https://doi.org/10.1145/3672608.3707805
+1 Introduction
+With the development of research fields like Artificial intelligence in education and Educational data mining, many educational institutions are using these methods to enhance e-learning environments [13, 14], for instance, Learning Management Systems (LMS) and Massive Open Online Courses (MOOCs). Students can use these enhanced e-learning platforms to access lecture materials, complete assignments with instant feedback, and communicate with instructors and classmates. Additionally, this allows researchers to collect and use a variety of data to analyze studentsՠlearning behaviors, such as demographic data [12], clicker data from digital textbook systems [8, 27], quiz scores [35], or submission of reports [37].
+  Identifying at-risk students has become a crucial topic in educational data mining [19, 23, 26]. At-risk students are more likely to drop out or fail courses, so instructors must provide support to help them stay on track. With the advances in machine learning (ML), many researchers [8, 18, 22, 25в7, 31, 44] have investigated predicting studentsՠlearning performance to identify at-risk students. To achieve this goal, they employed data from e-learning platforms and used traditional ML or deep learning algorithms [1, 8, 36, 37]. However, most studies applied ML or deep learning models to identify at-risk students by utilizing the whole course data after the course finished [1, 36]. Nevertheless, to increase the applicability of results, identifying at-risk students should be conducted before the course ends to provide timely support, allowing these students to continue in courses with an increased chance of success [52].
+  The present study proposes a novel approach to identifying at-risk students using a deep learning framework called RNNAttention-KD. We used recurrent neural networks (RNNs), a type of neural network for handling time-series data. We then leveraged the attention mechanism [4, 29] to exploit the time sequence of studentsՠlearning activities data to improve predictive performance. In addition, we employed knowledge distillation (KD) [20]. KD is a machine learning technique for compressing model size by transferring knowledge from a large model (known as the teacher model) to a smaller model (known as the student model).
+  We focus on identifying at-risk students early. While studentsՠperformance prediction using whole course data generally yields higher accuracy due to the larger dataset, an early prediction that utilizes a limited dataset is more beneficial in actual class settings. This allows for timely interventions to support at-risk students. We thus use KD for time compression in RNNs by transferring knowledge from the teacher model, which was trained on the entire course data with full information, to the student model, which only has information up to the predicted early time step to identify atrisk students. This allows us to utilize only information up to the early weeks in the student model, which performs better than the model trained only on the limited data without knowledge from the teacher model. The contributions of the paper are as follows:
+(1) We introduce KD, which is generally used for model compression applications [20], for the novel application of compressing time series to identify at-risk students early using the methods of educational data mining.
+(2) We propose the RNN-Attention-KD framework to enhance early performance prediction, which leverages the strengths of RNNs in handling time-sequence educational data to predict studentsՠperformance at each time step. The attention mechanism enables the model to focus on relevant time steps for improved predictive accuracy, while KD compresses the time steps to facilitate early prediction.
+(3) We analyze and evaluate the performance of RNN-AttentionKD to identify at-risk students early based on the studentsՠlearning logs collected from a higher education course.
+  The rest of this paper is organized as follows: Section 2 discusses related studies in the areas of early prediction and KD. Section 3 details the RNN-Attention-KD framework. Section 4 describes the methods for dataset collection, feature engineering, and evaluation. The empirical results of this study on RNN-Attention-KD are reported in Section 5. Finally, Section 6 presents the conclusions and future research challenges stemming from the present study.
+2 Related Work
+2.1 Early Prediction of Student Performance
+Predicting student performance is a key research topic in educational data mining and learning analytics, particularly in addressing the issue of at-risk student prediction. With the increasing use and variety of learning management systems (LMS), researchers can collect data on studentsՠlearning behaviors and analyze it to develop innovative ways of supporting at-risk students. This helps to prevent them from dropping out or failing their courses [37, 48].
+  Many studies used the traditional approach to classifying student performance as at-risk or no-risk, relying on conventional machine learning algorithms such as Logistic Regression (LR) [39, 43], Support Vector Machine (SVM) [17, 30, 43], Tree-based algorithms [5, 7, 17, 43], and K-Means Clustering [15, 30]. These algorithms were utilized to identify at-risk students based on stream data within a time sequence. For instance, Casalino et al. [7] processed the Open University Learning Analytics Dataset (OULAD) as a stream of evolving data. OULAD was divided into temporal chunks based on semesters to classify studentsՠlearning outcomes using Adaptive Random Forest (ARF). The results showed that ARF efficiently and correctly classified studentsՠoutcomes by processing educational data as a stream rather than the non-streamed version, which cannot be reliably used in an actual classroom setting. After deep learning became more prominent in EDM, previous studies employed deep neural networks, such as multi-layer perceptron (MLP) [37, 49], recurrent neural networks (RNNs) [34, 42], and graph neural networks [3], for studentsՠperformance prediction tasks.
+  In addition, early prediction of studentsՠlearning behaviors is essential for identifying at-risk students as soon as possible. This task aims to recognize and provide early warning to at-risk students who have low performance and tend to drop out, enabling timely intervention by instructors while a course is in progress [22]. Therefore, RNNs algorithms, including the Gated Recurrent Unit (GRU) [11] and the Long Short Term Memory (LSTM) [21], are the most utilized to predict studentsՠperformance using studentsՠlearning logs on daily or weekly basis for early prediction [2, 44]. For instance, Kim et al. [25] introduced GridNet, which used the bidirectional long short-term memory (Bi-LSTM) as a backbone for early prediction using the data from an online learning platform. They found that GridNet improved student performance prediction accuracy over the weeks. Chen and Cui [9] utilized LSTM to analyze studentsՠonline temporal behaviors on LMS data for early prediction. They compared LSTM with eight conventional machine learning algorithms, measuring the area under the ROC (receiver operating characteristic) curve (AUC) scores. They found that the AUC score of LSTM was 80.1%, which was higher than those of all the other machine learning classifiers in the first 28 days of data.
+2.2 Knowledge Distillation
+Knowledge Distillation (KD) is an ML technique that transfers the knowledge of a teacher model to a student model while maintaining prediction performance. This is achieved by enabling the student model to mimic the teacher modelճ behavior by learning its feature representations or reproducing its prediction outputs.
+  A loss function generally computes numerical values based on a modelճ output predictions. In the context of KD, we use the loss function to measure how well the student modelճ predictions match the target outputs and as a guide for adjusting the student modelճ internal parameters [16]. However, the loss function itself does not directly update these parameters. We thus rely on a trained teacher model, with fixed parameters, to guide the student model. This encourages the student model to learn representations and behaviors similar to the teacher model.
+  The KD method was first proposed by Hinton et al. [20]ճ study, where knowledge is distilled from the teacher model by minimizing the Kullback-Leibler divergence between the teacherճ soft logits and the studentճ predictions. Subsequently, many KD methods that leverage intermediate features from the teacher model to propagate knowledge to the student model were proposed to enhance the student modelճ prediction performance. FitNets [38], a feature-based distillation method, introduced the concept of transferring knowledge by minimizing the Euclidean distance between intermediate layers of the teacher and student models. Attention distribution transfer [40, 51] was introduced to propagate knowledge from the attention maps of a convolutional network, which represent specific features of the teacher model, to the student model.
+  KD is typically used to compress models for specific tasks such as language modelling [24, 46], low-resolution image recognition [40], and object detection [10, 47]. In this study, we apply the KD method to our model to achieve high efficiency in early prediction tasks for detecting at-risk students. Data about studentsՠlearning activity is time-sequential, as their behaviors change weekly based on class activities and their cognition development, which typically improves after each class. We thus utilize RNNs to handle the time-series data and KD for time-series compression, aiming to enhance early prediction capabilities [31].
+  To the best of our knowledge, Murata et al. [31] was the first to propose RNN-FitNets. They utilized RNNs to learn the time-series information inherent in student learning behavior data. FitNets [38] reproduced the hidden state of the RNN in a student model, which was trained with a teacher model using whole-course data, enabling compressed time-series representation for early prediction.
+  However, a significant shortcoming of RNNs is that they may be prone to the problem of vanishing gradients when processing long input sequences, which means the model struggles to properly learn patterns from earlier time steps during training. This happens because the model tends to forget earlier inputs as a model moves through the subsequent parts of the sequence [6]. This issue is particularly concerning in early prediction tasks, where information from the initial weeks may be crucial. To address this, we propose an RNN with an attention mechanism that retains essential information from the entire input sequence by focusing on critical parts of the time series [4, 29]. This enhanced focus can also improve the guidance provided to the student model during KD from the teacher model [45], which our study aims to evaluate.
+3 Research Methods
+3.1 Problem Statement
+The problem statement for early prediction of at-risk students using KD can be defined as follows: Let ?? = {??1,??2, . . . ,???? } represent the dataset containing the learning activity data of all students in a course, where ???? denotes the data for student ??. For each student ??, ???? comprises the learning activity features collected weekly over the course duration of ?? weeks, expressed as ???? =
+{(??1,??1), (??2,??2), . . . , (????,????)}. Here, ???? represents the studentsՠlearning activity features of a week ?? and ???? is the corresponding at-risk or non-at-risk label.
+  The teacher model ???? : ???? ? ?? is trained on the complete course dataset ??, where ???? is the input space of features from all ?? weeks. The objective of our study is to design a KD framework to train a student model ???? : ???? ? ?? using ??early and knowledge
+
+Figure 1: RNN with an attention mechanism structure (RNNAttention).
+transferred from ?? . Here,?? = {(??1,??1 2 is a subset of data for student ??, where ????? represents the learning features of student ?? for only the first ?? weeks (?? < ??).
+	??	??early	?	), (???,??2), . . . , (????? ,???? )}
+  Our study aims to find the optimal parameters for ???? that enable accurate predictions and identification of at-risk students using only early-week data, while leveraging the knowledge distilled from the more comprehensive teacher model ???? . The objective function can be expressed as Equation 1:
+             argmin????,???? ??(???? (?????),??true, ???? (????)), (1) where ?? is a total loss function that incorporates both the true labels ??true and the soft targets provided by the teacher model ???? , ???? (?????) is the prediction of the student model on early-week data, and ???? (????) is the prediction of the teacher model on full-course data. The total loss function ?? is further described in Section 3.2.
+3.2 Overview of the Proposed Framework
+This section introduces the architecture of the RNN with an attention mechanism model (RNN-Attention), which serves as the teacher model in the KD framework. Subsequently, we describe the KD method proposed in this study, which aims to compress the time series length and detect at-risk students at an early stage while maintaining high prediction performance.
+3.2.1 RNN with an Attention Mechanism Model (RNN-Attention). In this study, we employ the RNN model shown in Fig. 1, a type of neural network, to process studentsՠlearning activity data, which were collected sequentially each week throughout a course. RNN has a loop structure in its hidden layer that enables it to incorporate information from past and current inputs. For prediction, RNN receives an input sequence ?? = (??1,??2, ...,????) with ???? ? R?? from the first to the??th time steps, where ?? represents the studentsՠlearning activity features. The hidden state ??? is calculated as follows:
+	h?? = ?? (h???1, x??)	(2)
+Here, ??? ? R?? is the hidden state at the ??th time step, ?? denotes the size of the hidden state, and ?? is a non-linear activation function within the RNN. However, RNNs are prone to vanishing gradient problems [6]. Therefore, ?? could alternatively be an LSTM [21] or GRU [11] activation function.
+  In natural language processing (NLP), RNNs, including LSTM and GRU, are commonly employed in machine translation as part of an encoder-decoder framework [41]. In this approach, the source sentence is encoded into a fixed-length vector, which is then passed to the decoder to generate the translation. However, a significant limitation arises when the source sentence is lengthy: the model tends to forget earlier inputs as it processes subsequent parts of the sequence. This issue is particularly concerning in early prediction tasks, where information from the initial stages may be crucial for identifying at-risk individuals. To address this problem, the attention mechanism is integrated with RNNs to ensure the model retains and utilizes important information from the entire sequence.
+  After the hidden layers from RNNs, the output vector from the hidden layers serves as input to the attention module, where the attention mechanism calculates the attention weight ???? for each time step ??. Then, the context vector ???? is obtained from the summation of the product between each attention weight ???? and the output from hidden layer ??? from RNNs.
+  In the traditional encoder-decoder model, the attention score is typically calculated based on the alignment score between the hidden state of each time step on the encoder and the current time step on the decoder. However, in our proposed model, which utilizes a single RNN structure, the alignment score ???? is computed between the hidden state of each time step ??? and the final time step ???, as described in Eq. (3). The final hidden ??? of the RNN contains the most comprehensive information that is accumulating information from each step throughout the sequence [50].
+	???? = (h??)?Wh??	(3)
+Here, ???? ? R1 is the alignment score of the time step ??th, ??? ? R?? is the hidden state on the final time step, and ?? ? R????? is a trainable parameter. Then, a softmax function is applied to the alignment score ???? to ensure the attention weight ???? sums to 1, as in Eq. (4).
+exp(????)
+	???? = ??	(4)
+꿿=1 exp(???? )
+  Subsequently, we employed the attention scores ???? (representing probability information) associated with the original hidden states ??? at each time step to compute the context vector ???? ? R?? as a weighted sum of the hidden states from all time steps.
+??
+?
+	???? = ????h??	(5)
+??=1
+  Once the context vector ???? is obtained from the attention module, we employ it as input to a multi-layer perceptron (MLP) for predicting the final output ??__ MLP comprises hidden units with the same dimension as the RNNճ hidden size and two output units for classifying the probability between at-risk and no-risk.
+3.2.2 Knowledge Distillation Framework. In this section, we propose a KD method for RNN with an attention mechanism (RNNAttention-KD) on early prediction tasks. We employ the KD method for time series compression to reproduce a hidden state of the RNN model, which was trained with a teacher model using whole-course data. Additionally, the attention mechanism is leveraged to enhance performance by guiding the student model to focus on the critical parts of the input time sequence. Figure 2 shows an overview of RNN-Attention-KD.
+  The teacher model ?? and student model ?? have structure as described in Section 3.2.1, including the input feature, number of layers, and number of hidden units. The teacher model is pre-trained using studentsՠlearning activity data from the entire course, spanning all time steps (1, 2, ..., ??). In contrast, the student model is trained up to the ??th time step, where 1  ??  ??. Therefore, the teacher and student models differ in their time series lengths.
+  The student model is trained in three steps during each epoch. First, the student model updates its parameters through the hidden layers, excluding the attention modules and output nodes. The parameters of the hidden layers are updated by minimizing the hint loss function L????. This allows the student model to learn to mimic the teacher modelճ hidden states, capturing the rich time series information from the entire course. The objective is defined as:
+	L???? = MSE(????? ,?????),	(6)
+where ????? ? R?? and ????? ? R?? refer to the hidden state of the teacher and student model, respectively. Since the structure of teacher and student models are the same, the number of hidden nodes ?? are also the same. MSE is the mean squared error loss function.
+  Once the hint loss function is updated, the attention module parameters within the student model will be updated next. Adjusting the attention weights on the context vector ?? enables the student model to capture valuable information about the relationship between early and future learning sessions, which is necessary for identifying at-risk students. We thus propose a context vector loss function (attention-based distillation) L???? to encourage knowledge transfer from the teacher to the student network. The objective of this function is as follows:
+	L???? = MSE(?????? ,?????? ),	(7)
+where ?????? ? R?? and ?????? ? R?? refer to the teacher and student model context vector, respectively.
+  Finally, the entire student model, including the output layers, is updated by minimizing the distillation loss L????. We apply two penalties: the soft cross-entropy loss between the predicted logits of the student and teacher models and the hard cross-entropy loss between the predicted logits of the student model and the ground truth. Soft cross-entropy measures how well the student modelճ predictions match the teacher modelճ predictions. However, the teacher model has the possibility of not providing the correct ground truth in some cases. Therefore, hard cross-entropy gauges how the student modelճ predictions match the ground truth. This ensures that the student model learns to make accurate predictions independently, beyond just copying the teacher modelճ predictions. The objective of this function is as follows:
+            L???? = H(ytrue,??__ + ??H(??__??__, (8) where H is the cross-entropy loss, ?? is a hyperparameter that balances soft and hard cross-entropy losses, ytrue is a true label, and ??__and ??__are predicted logits from the teacher and student model, respectively.
+
+Figure 2: Knowledge Distillation Framework of the RNN with an attention mechanism structure (RNN-Attention-KD).
+4 Experimental Setting
+4.1 Dataset and Feature Engineering
+The study utilized data collected from a programming theory (PT) course, a required subject for second-year undergraduate students at the Faculty of Information Science and Engineering, Kyushu University, Japan. In the course, students learn basic knowledge and skills of computer programming by using the Scheme language. The course attendees are beginners in this programming language.
+  Data of the total of 219 students throughout the spring quarters from 2019 to 2022 were used. Each quarter lasted seven weeks. All four course offerings employed the same syllabus, although the teaching modality differed: PT2019 was held on-site, and the other three were held online due to the COVID-19 pandemic restrictions.
+  The grade distribution in the PT courses is listed in Table 1. Due to the sometimes limited number of students receiving grade points of C, D, and F, our study employed a binary classification approach rather than a five-label classification. Students were categorized into two groups: at-risk and non-at-risk. Those who obtained grade points of C, D, or F were classified as at-risk, while students achieving higher grades were designated as non-at-risk.
+Table 1: Distribution of grades per number of students (219 students total) in the Programming Theory (PT) courses.
+
+A
+24
+(48.0%)
+22
+(35.5%)
+20
+(37.0%)
+17
+(32.1%)
+B
+6
+(12.0%)
+24
+(38.7%)
+15
+(27.8%)
+7
+(13.2%)
+C
+4
+(8.0%)
+6
+(9.7%)
+10
+(18.5%)
+5
+(9.4%)
+D
+6
+(12.0%)
+3
+(4.8%)
+3
+(5.6%)
+22
+(41.5%)
+F
+10
+(20.0%)
+7
+(11.3%)
+6
+(11.1%)
+2
+(3.8%)
+Total
+50
+
+62
+
+54
+
+53
+
+
+  Students used Moodle, a learning management system, and BookRoll [32], an e-book system, to access lecture materials and assignments. Both of these systems automatically logged student interactions, which were then converted to features as shown in Table 2. Attendance and report submission data were extracted from Moodle, categorizing student activities for each lecture. Additional data, including reading time, notes, total actions, and others were obtained from BookRoll. Combining these data sources enabled us to more accurately capture student learning progressions.
+The feature values were determined based on Score Ranking
+Points (SRPs). SRPs, inspired by Active Learner Points (ALPs) [33Р35], are an evaluation system that assesses studentsՠlearning activities through weekly scores based on percentile rankings within a given class. Specifically, scores from 10 to 1 were incorporated, as shown in Table 3, to enhance the feature vectorճ representational capacity and facilitate the modelճ comprehension of underlying patterns. This refined scale offers greater granularity compared to the 5 to 1 scale used in ALPs. Consequently, twelve SRPs were incorporated as input features for the prediction model. In cases where multiple report assignments were due within a single week, the report scores were averaged. Before the SRPs were input into the prediction model, all SRPs were normalized to a 0б range to ensure consistency and facilitate training.
+Table 2: Description of each feature for prediction models based on student activities.
+Platforms
+Activities
+Explanation
+LMS (Moodle)
+Attendance
+Report
+Tracks attendance (present, late, absent) for each lecture
+Tracks report submission status (on time, late, none) for each lecture
+
+Course Accesses
+Total number of course accesses on Moodle
+E-Book (BookRoll)
+Reading Time
+Markers
+Memos
+Total Actions
+Open
+Reading time of lecture materials (in seconds)
+Number of markers (highlights) a student added
+Number of memos (notes) a student added
+Total number of reading operation events
+Number of times a student opened the e-book
+
+Next
+Number of times a student went to the next page
+
+Prev
+Number of times a student backed to the previous page
+
+Page Jump
+Number of times a student jumped to a particular page
+
+Close
+Number of times a student closed the e-book
+
+  In order to simulate the real-world scenario of forecasting future course outcomes based on previously available data, four PT courses were divided into six datasets. Each dataset represents a task where training is performed on one or more prior-year courses, while the subsequent yearճ course serves as the test set. This approach enables a more robust evaluation of model performance, ensuring that the results are not tied to a single dataset but remain consistent across multiple datasets. The datasets are detailed in Table 4. T and P denote train and test (predict) datasets, respectively. The T19P20, T20P21, and T21P22 datasets each consisted of one training course Table 3: Criteria for Score Ranking Points (SRPs).
+Feature
+Active Score
+Attendance
+Attendance = 10, Late = 5,
+Absence = 0
+Report
+On Time = 10, Late = 5,
+None = 0
+Course Accesses, Reading Time,
+Markers, Memos, Total Actions,
+Open, Next, Prev, Page Jump, Close
+Top 1б0% = 10,
+Top 11в0% = 9, ...,
+Bottom 91б00% = 1
+Any feature with zero activity
+0 score
+and one for testing from the following year. The T1920P21 and T2021P22 dataset comprised two consecutive years of courses used for training, while the T192021P22 dataset comprised three. In both cases, one course from the subsequent year was reserved for testing.
+Table 4: The details of the datasets.
+Dataset
+Train & Validation course
+Test Course
+T19P20
+2019
+2020
+T20P21
+2020
+2021
+T21P22
+2021
+2022
+T1920P21
+2019, 2020
+2021
+T2021P22
+2020, 2021
+2022
+T192021P22
+2019, 2020, 2021
+2022
+4.2 Evaluation Methods
+4.2.1 Metrics. This study employed three metrics to evaluate the performance of the binary classifiers: precision, recall, and F1measure. Given the imbalanced nature of the experimental data, weighted average F1-scores were calculated across multiple runs. A confusion matrix was utilized to quantify true positive (TP), false positive (FP), false negative (FN), and true negative (TN) instances in the test samples to compute precision, recall, and F1-measure. We assigned at-risk students a label of 1 (positive class) and non-at-risk students a label of 0 (negative class), following the standard binary classification convention [43]. Precision is calculated as the ratio between the number of correctly predicted at-risk students and the total number of students predicted as at-risk, whereas recall is defined as the ratio between the number of correctly predicted at-risk students and the total number of actual at-risk students. The F1-score, which is calculated from the harmonic mean of precision and recall, represents both precision and recall in one metric.
+4.2.2 Selection of Models and Parameters. For the hyperparameter search (using grid search) on each dataset, we employed 5-fold crossvalidation on the train set to find the optimal hyperparameters on RNN-Attention-KD. We adjusted the backbone models, GRU and LSTM. Since the data size is limited, we use one hidden layer on GRU and LSTM, with the following units: 4, 6, 8, and 10. We then adjusted the learning rate with 0.01 and 0.001, with weight decay (L2 regularization) of 1E-5, batch size of 8, and epochs at 150.
+  Based on the average cross-validation performance across all datasets, we selected the GRU as the backbone, with one hidden layer and four units. The GRU is more effective at handling dependencies in shorter time series, whereas the LSTM performs better with longer time series [18]. Since our datasets consist of weekly units, each dataset spanning seven weeks, the GRU is more suitable for this case. After the hyperparameter search, the prediction model was trained using the entire training set, and the result was subsequently evaluated on test set.
+5 Experimental Results and Discussion
+In this study, we first compare the ability to detect at-risk students using conventional algorithms, followed by an ablation study to investigate the contribution of different distillation objectives in RNN-Attention-KD. When testing the performance of models, we executed the training independently 30 times, and the metricsՠmeans were compared in all executions to avoid stochastic results.
+5.1 Ability to Detect At-risk Students
+Table 5 compares RNN-Attention-KD with several conventional algorithm baselines: MLP, RNN, GRU, LSTM, the bidirectional gated recurrent unit (Bi-GRU), and Bi-LSTM. RNN-Attention-KD is trained according to the KD strategy described in Section 3.2.2, using the teacher model (RNN-Attention), with details in Table 7.
+Table 5: Comparison of the ability for detecting at-risk students. The results report Precision (PR), Recall (RE), and F1-measure (F1). Bold numbers indicate the highest value for each metric in each week.
+Dataset
+Week (s)
+
+MLP
+
+RNN
+
+GRU
+
+LSTM
+
+
+Bi-GRU
+
+Bi-LSTM
+RNN-Attention-KD
+
+
+PR
+RE
+F1
+PR
+RE
+F1
+PR
+RE
+F1
+PR
+RE
+F1
+PR
+RE
+F1
+PR
+RE
+F1
+PR
+RE
+F1
+T19P20
+1-3
+1-4
+1-5
+0.44 0.47
+0.54
+0.84
+0.69
+0.68
+0.58
+0.56
+0.60
+0.47
+0.50
+0.62
+0.76
+0.70
+0.73
+0.58
+0.59
+0.67
+0.45 0.51
+0.62
+0.73 0.71
+0.71
+0.56 0.59
+0.66
+0.45 0.52
+0.59
+0.78
+0.75
+0.75
+0.57
+0.61
+0.66
+0.46
+0.54
+0.65
+0.72
+0.72
+0.69
+0.56 0.62
+0.67
+0.45
+0.54
+0.63
+0.81
+0.76
+0.73
+0.57
+0.63
+0.67
+0.41 0.48
+0.62
+0.83
+0.81
+0.72
+0.55 0.60
+0.66
+
+1-6
+0.58
+0.70
+0.63
+0.66
+0.77
+0.71
+0.68
+0.80
+0.73
+0.65
+0.82
+0.72
+0.65
+0.79
+0.71
+0.64
+0.83
+0.72
+0.66
+0.79
+0.72
+T20P21
+1-3
+1-4
+1-5
+0.53 0.48
+0.70
+0.33 0.28
+0.38
+0.39 0.36
+0.49
+0.89 0.73
+0.80
+0.30 0.34
+0.41
+0.44 0.46
+0.53
+0.89 0.72
+0.81
+0.29 0.35
+0.44
+0.43 0.47
+0.57
+0.94
+0.83
+0.80
+0.31
+0.39
+0.46
+0.46
+0.53
+0.58
+0.89 0.71
+0.84
+0.28
+0.34
+0.47
+0.42
+0.46
+0.60
+0.89
+0.69
+0.87
+0.35
+0.36
+0.45
+0.49
+0.48
+0.59
+0.56 0.59
+0.71
+0.47 0.44
+0.47
+0.50
+0.50
+0.55
+
+1-6
+0.74
+0.39
+0.51
+0.79
+0.49
+0.60
+0.87
+0.48
+0.61
+0.81
+0.44
+0.57
+0.81
+0.45
+0.58
+0.78
+0.48
+0.59
+0.83
+0.52
+0.64
+T21P22
+1-3
+1-4
+1-5
+0.58 0.57
+0.60
+0.31 0.29
+0.29
+0.40 0.39
+0.39
+0.82
+0.91
+0.91
+0.30
+0.35
+0.37
+0.44 0.50
+0.52
+0.83
+0.89
+0.91
+0.29
+0.33
+0.35
+0.42
+0.48
+0.51
+0.81 0.84
+0.85
+0.32 0.37
+0.39
+0.46
+0.51
+0.53
+0.90
+0.86
+0.90
+0.31
+0.33
+0.37
+0.46 0.48
+0.52
+0.75 0.81
+0.83
+0.34 0.36
+0.41
+0.46 0.50
+0.55
+0.67 0.69
+0.82
+0.40 0.41
+0.44
+0.50 0.51
+0.57
+
+1-6
+0.74
+0.27
+0.40
+0.94
+0.38
+0.53
+0.93
+0.39
+0.55
+0.87
+0.38
+0.53
+0.94
+0.39
+0.55
+0.87
+0.37
+0.52
+0.86
+0.42
+0.56
+T1920P21
+1-3
+1-4
+1-5
+0.49 0.55
+0.78
+0.36 0.34
+0.39
+0.41 0.41
+0.52
+0.80 0.75
+0.80
+0.37
+0.42
+0.45
+0.49
+0.54
+0.58
+0.85 0.78
+0.84
+0.36 0.46
+0.45
+0.50
+0.57
+0.58
+0.87
+0.81
+0.92
+0.33
+0.43
+0.45
+0.47
+0.56
+0.60
+0.78 0.80
+0.84
+0.36 0.44
+0.48
+0.49
+0.57
+0.61
+0.84
+0.84
+0.97
+0.31
+0.41
+0.42
+0.45 0.55
+0.59
+0.61 0.72
+0.74
+0.37 0.49
+0.50
+0.45
+0.58
+0.59
+
+1-6
+0.82
+0.46
+0.59
+0.84
+0.48
+0.61
+0.83
+0.45
+0.58
+0.88
+0.46
+0.60
+0.85
+0.45
+0.59
+0.91
+0.45
+0.60
+0.79
+0.48
+0.59
+T2021P22
+1-3
+1-4
+1-5
+0.69 0.64
+0.74
+0.30 0.36
+0.40
+0.41 0.45
+0.52
+0.78
+0.80
+0.87
+0.36
+0.37
+0.42
+0.49
+0.50
+0.56
+0.78
+0.81
+0.86
+0.34
+0.39
+0.42
+0.47
+0.52
+0.56
+0.77 0.79
+0.84
+0.34 0.40
+0.41
+0.47 0.53
+0.55
+0.83
+0.78
+0.87
+0.36
+0.36
+0.38
+0.50
+0.49
+0.53
+0.77 0.74
+0.85
+0.38 0.39
+0.45
+0.50
+0.51
+0.59
+0.68 0.72
+0.82
+0.42 0.46
+0.47
+0.52 0.56
+0.59
+
+1-6
+0.84
+0.39
+0.53
+0.86
+0.39
+0.53
+0.88
+0.35
+0.50
+0.83
+0.39
+0.53
+0.87
+0.35
+0.49
+0.82
+0.41
+0.54
+0.82
+0.39
+0.52
+T192021P22
+1-3
+1-4
+1-5
+0.71 0.78
+0.82
+0.33 0.36
+0.39
+0.44 0.49
+0.52
+0.90
+0.85
+0.87
+0.41
+0.41
+0.44
+0.56
+0.55
+0.58
+0.88 0.82
+0.87
+0.40 0.39
+0.45
+0.55 0.52
+0.59
+0.89 0.81
+0.86
+0.41 0.39
+0.45
+0.56 0.53
+0.59
+0.87
+0.82
+0.88
+0.41
+0.36
+0.47
+0.56
+0.49
+0.61
+0.86 0.76
+0.86
+0.42 0.35
+0.47
+0.57
+0.48
+0.61
+0.74 0.76
+0.83
+0.43 0.43
+0.54
+0.54
+0.55
+0.65
+
+1-6
+0.93
+0.39
+0.55
+0.87
+0.43
+0.57
+0.85
+0.42
+0.57
+0.85
+0.41
+0.55
+0.86
+0.43
+0.58
+0.83
+0.43
+0.56
+0.81
+0.48
+0.60
+Table 6: Evaluation results of the ablation study in the PT course. The results report Precision (PR), Recall (RE), and F1-measure (F1). Bold numbers indicate the highest value for each metric in each week.
+Dataset
+Week (s)
+L???? +L????+L???? (Soft) L???? +L???? (Soft) L????+L???? (Soft)	L???? +L????
+Only L????
+Only L????
+Only L???? (Soft)
+
+
+PR
+RE
+F1
+PR
+RE
+F1
+PR
+RE
+F1
+PR
+RE
+F1
+PR
+RE
+F1
+PR
+RE
+F1
+PR
+RE
+F1
+T19P20
+1-3
+1-4
+1-5
+0.41 0.48
+0.62
+0.83
+0.81
+0.72
+0.55
+0.60
+0.66
+0.41 0.48
+0.57
+0.82
+0.79
+0.74
+0.55
+0.60
+0.64
+0.43
+0.50
+0.61
+0.83
+0.79
+0.72
+0.56
+0.61
+0.66
+0.42
+0.50
+0.64
+0.83
+0.80
+0.72
+0.55
+0.61
+0.67
+0.41 0.47
+0.57
+0.79
+0.77
+0.74
+0.54
+0.58
+0.64
+0.42 0.49
+0.60
+0.82
+0.80
+0.74
+0.55
+0.61
+0.67
+0.44
+0.48
+0.60
+0.82
+0.75
+0.69
+0.57
+0.58
+0.64
+
+1-6
+0.66
+0.79
+0.72
+0.68
+0.76
+0.72
+0.69
+0.80
+0.74
+0.66
+0.79
+0.72
+0.66
+0.76
+0.70
+0.69
+0.81
+0.74
+0.69
+0.76
+0.72
+T20P21
+1-3
+1-4
+1-5
+0.56 0.59
+0.71
+0.47
+0.44
+0.47
+0.50
+0.50
+0.55
+0.60
+0.59
+0.71
+0.43
+0.45
+0.47
+0.50
+0.51
+0.56
+0.55 0.56
+0.71
+0.42 0.40
+0.41
+0.47 0.46
+0.52
+0.56 0.59
+0.69
+0.47
+0.43
+0.48
+0.51
+0.49
+0.56
+0.58
+0.60
+0.73
+0.44
+0.44
+0.44
+0.49 0.50
+0.55
+0.53 0.56
+0.70
+0.44 0.41
+0.46
+0.47 0.47
+0.55
+0.58 0.58
+0.72
+0.37 0.41
+0.43
+0.44 0.47
+0.53
+
+1-6
+0.83
+0.52
+0.64
+0.78
+0.47
+0.58
+0.86
+0.52
+0.65
+0.81
+0.51
+0.62
+0.78
+0.49
+0.60
+0.85
+0.51
+0.63
+0.78
+0.46
+0.57
+T21P22
+1-3
+1-4
+1-5
+0.67
+0.69
+0.82
+0.40
+0.41
+0.44
+0.50
+0.51
+0.57
+0.67 0.69
+0.78
+0.38 0.41
+0.39
+0.49 0.51
+0.51
+0.66 0.69
+0.81
+0.41
+0.42
+0.44
+0.51
+0.52
+0.57
+0.68
+0.70
+0.81
+0.40
+0.45
+0.44
+0.50
+0.54
+0.57
+0.67 0.69
+0.79
+0.39 0.41
+0.41
+0.49 0.51
+0.53
+0.65 0.69
+0.79
+0.39
+0.42
+0.46
+0.49
+0.51
+0.57
+0.68
+0.72
+0.79
+0.38
+0.38
+0.41
+0.49
+0.49
+0.53
+
+1-6
+0.86
+0.42
+0.56
+0.89
+0.37
+0.52
+0.86
+0.42
+0.56
+0.87
+0.43
+0.58
+0.86
+0.37
+0.51
+0.83
+0.44
+0.57
+0.86
+0.36
+0.51
+T1920P21
+1-3
+1-4
+1-5
+0.61
+0.72
+0.74
+0.37
+0.49
+0.50
+0.45
+0.58
+0.59
+0.60
+0.70
+0.75
+0.41
+0.46
+0.49
+0.48
+0.55
+0.59
+0.60 0.68
+0.73
+0.40 0.45
+0.49
+0.47 0.54
+0.58
+0.58 0.70
+0.74
+0.38 0.46
+0.49
+0.45 0.55
+0.58
+0.58 0.66
+0.72
+0.41
+0.45
+0.49
+0.47
+0.53
+0.57
+0.60 0.66
+0.73
+0.38 0.41
+0.49
+0.46 0.50
+0.58
+0.60
+0.69
+0.75
+0.37 0.41
+0.44
+0.45 0.51
+0.55
+
+1-6
+0.79
+0.48
+0.59
+0.78
+0.50
+0.60
+0.82
+0.49
+0.61
+0.79
+0.48
+0.59
+0.77
+0.49
+0.60
+0.84
+0.49
+0.61
+0.81
+0.46
+0.58
+T2021P22
+1-3
+1-4
+1-5
+0.68
+0.72
+0.82
+0.42
+0.46
+0.47
+0.52 0.56
+0.59
+0.66
+0.74
+0.81
+0.41 0.44
+0.47
+0.51 0.54
+0.59
+0.66
+0.72
+0.83
+0.42 0.45
+0.47
+0.51 0.55
+0.60
+0.68 0.71
+0.82
+0.44
+0.46
+0.46
+0.53
+0.55
+0.59
+0.68
+0.74
+0.82
+0.39
+0.47
+0.45
+0.49
+0.57
+0.58
+0.67
+0.68
+0.83
+0.42 0.43
+0.51
+0.51 0.52
+0.63
+0.68 0.72
+0.79
+0.37 0.44
+0.46
+0.48 0.54
+0.57
+
+1-6
+0.82
+0.39
+0.52
+0.79
+0.39
+0.52
+0.83
+0.37
+0.51
+0.79
+0.40
+0.53
+0.81
+0.37
+0.50
+0.80
+0.36
+0.49
+0.79
+0.37
+0.50
+T192021P22
+1-3 1-4
+1-5
+0.74 0.76
+0.83
+0.43
+0.43
+0.54
+0.54
+0.55
+0.65
+0.73 0.77
+0.81
+0.43
+0.42
+0.50
+0.54
+0.54
+0.61
+0.71
+0.74
+0.84
+0.40
+0.43
+0.58
+0.50
+0.54
+0.68
+0.75
+0.76
+0.84
+0.42
+0.43
+0.53
+0.54
+0.55
+0.65
+0.74
+0.80
+0.83
+0.43
+0.44
+0.49
+0.54
+0.56
+0.60
+0.70 0.75
+0.80
+0.41 0.43
+0.57
+0.51 0.54
+0.66
+0.77
+0.75
+0.81
+0.36
+0.42
+0.46
+0.49
+0.53
+0.59
+
+1-6
+0.81
+0.48
+0.60
+0.80
+0.44
+0.56
+0.80
+0.46
+0.58
+0.79
+0.47
+0.59
+0.82
+0.45
+0.58
+0.78
+0.46
+0.58
+0.80
+0.43
+0.56
+
+  The baseline models are trained using SRP inputs directly from the first week to the predicted week. When students enroll in the PT course during Weeks 1в, they are only exposed to a small portion of the course content, and the data collected during this period does not fully capture important behavioral patterns and learning progress. This limited scope of data makes it harder for prediction models to represent studentsՠlearning behavior and predict at-risk
+accurately. We thus begin identifying at-risk students starting from Weeks 3ж since students engage with more content and provide more affluent and informative feature representations. It is important to note that students from the Faculty of Information Science and Electrical Engineering, Kyushu University can withdraw from a course only after five weeks of attending it. Therefore, instructors can use our framework to aid at-risk students before they withdraw.
+Table 7: Performance metrics of the teacher model (RNNAttention) trained on the entire PT course, used to train RNNAttention-KD.
+Dataset
+Precision
+Recall
+F1-measure
+T19P20
+0.77
+0.81
+0.79
+T20P21
+0.86
+0.63
+0.73
+T21P22
+0.94
+0.52
+0.67
+T1920P21
+0.92
+0.63
+0.75
+T2021P22
+0.86
+0.62
+0.72
+T192021P22
+0.77
+0.69
+0.73
+  Notably, the teacher model on the T192021P22 dataset yielded lower results than other datasets, even though the models were trained on the datasets from three PT courses. Three PT courses (PT2019, PT2020, and PT2021) introduce diverse studentsՠlearning patterns in both on-site and online classes. Studentsՠlearning patterns on PT2022 may have a contextual mismatch with previous data courses, diluting the relevance of older data to future courses and making it harder for the model on the T192021P22 dataset to learn stable patterns that generalize.
+  The results from Table 5 show that RNN-Attention-KD outperforms conventional neural network models with high recall and F1-measure values in four out of six datasets: T20P21, T21P22, T2021P22, and T192021P22. Notably, the high recall values mean our model could identify most at-risk students from the total population of at-risk students in early states better than the conventional algorithm model. Although RNN-Attention-KD performed better, it fell short of GRU, Bi-GRU, and Bi-LSTM in the T19P20 and T1920P21 datasets. The reason may be attributed to the fact that the PT2019 course was conducted as an on-site class, and PT2020, PT2021, and PT2022 were online classes due to the COVID-19 pandemic. The difference in learning environments likely affected studentsՠlearning patterns, which could explain the decrease in performance when training with on-site data and predicting with online course data. RNN-Attention-KD achieved the highest average recall and F1-measure across all datasets, outperforming other models. For example, it obtained recall and F1-measure of 0.49 and 0.51 for Weeks 1г and 0.51 and 0.61 for Weeks 1ж, respectively.
+  In addition, RNN models are designed to leverage the temporal context and patterns within time-sequence data. Since removing the later week of data may eliminate an important portion of sequential information that might have been crucial for making accurate predictions, predictive performance was decreased on student models on all datasets. In other words, the additional week of studentsՠlearning data enabled the RNN to identify patterns better and ultimately make more accurate classifications, which explains why the F1-score dropped when those data were removed.
+  Notably, the time-dependent algorithms, such as RNN, GRU, and LSTM, provided better performance than MLP, which is a time-independent algorithm, on all metrics. This demonstrates an important property of time-dependent algorithms Рthe ability to capture the relationships between sequential data points and consider how data evolves at each time step [28].
+  However, the grade distribution in PT courses is somewhat skewed, especially in PT2020 and PT2021, as shown in Table 1.
+This imbalance influences the prediction modelճ learned decision boundaries. In addition, this may make the prediction models struggle to recognize students as non-at-risk more than at-risk students, which affects the recall and F1-score due to insufficient examples. To mitigate these biases, we will adjust the model, apply oversampling techniques, and collect more features to obtain more representative data, which may be necessary to mitigate possible biases and achieve more consistently reliable predictions.
+5.2 Ablation Study
+Next, we conduct ablation studies on RNN-Attention-KD to examine the contributions of different distillation objectives: hint loss L???? (Equation 6), context vector loss L???? (Equation 7), and distillation loss on the soft cross-entropy loss L???? (Equation 8).
+  The ablation study results are listed in Table 6. RNN-AttentionKD utilizing the knowledge that distills from all objectives and using only the hint and context loss did not show significant performance differences. Therefore, we suggest that RNN-Attention-KD, which used only two componentsѨint loss and context vector lossѩs sufficient to transfer knowledge from the teacher model to the student model to improve the prediction performance. This can simplify the distillation process and reduce the computational complexity, which makes the training process more efficient.
+  On the contrary, the model that relied solely on the distillation loss on the soft cross-entropy loss from the teacher model had the worst recall and F1-score. This means the soft cross-entropy loss on the distillation loss was an obstacle to the performance on RNNAttention-KD. Soft cross-entropy loss transfers a finer knowledge called Ҥark knowledgeӠfrom predicted logits of at-risk and no-risk classes on the output units on the teacher to the student model. Soft cross-entropy loss might force the student model to learn unnecessarily complex patterns, leading to overfitting that makes a student model perform poorly. Even though we set a lower weight of hyperparameter ?? (= 0.1) that uses soft and hard cross-entropy losses for balances, the ability to generalize on RNN-Attention-KD was degraded by focusing too much on approximating the predicted logits on the teacher model rather than learning from the ground truth labels. Therefore, the hint loss and the context vector loss can enhance model effectiveness for identifying at-risk individuals.
+6 Conclusions and Future Work
+This study introduced RNN-Attention-KD, a novel framework for identifying at-risk students early. This is a crucial task in EDM research to prevent students from dropping out, enabling instructors to provide timely support. RNN-Attention-KD employed RNNs that can handle time-series information in educational data. It also leveraged the benefits of attention mechanisms to solve the shortcomings of RNNs that had a vanishing gradient when capturing long-term time series, retaining vital information by focusing on critical parts of the input sequence. KD is used to compress time series to identify at-risk students by distilling the knowledge from the teacher model, which was trained on the entire course data to increase model prediction performance.
+  The empirical results showed that RNN-Attention-KD outperforms traditional neural network models with high recall and F1measure values. Nevertheless, the case that utilized on-site classes as a training dataset and online classes as a test set decreased the RNN-Attention-KD performance since studentsՠlearning patterns differed in these different learning environments and modalities.
+  In addition, an ablation study was conducted to investigate the contributions of different distillation objectives. We found that hint loss from the hidden layer and context vector loss from the attention module on RNN can enhance prediction performance more than the distillation loss on the soft cross-entropy loss from the teacher model. The last case led to overfitting and thus making a student model perform poorly.
+  This study has some limitations that remain as open challenges to be addressed in future research.
+(1) Due to the data being collected from only one subject at one university, the modelճ adaptability across different learning environments still needs to be investigated. Future research should examine the modelճ performance and tuning strategies in various instructional contexts, such as different subject areas, educational levels, and teaching methods. Additionally, we will explore how the model can adapt through machine learning techniques, such as domain adaptation, to enhance its generalizability.
+(2) The present study was not conducted on deploying the RNNAttention-KD for early prediction within actual classes. The modelճ usability in real-world applications still remains to be evaluated. Future research should conduct studies in actual classes to investigate model adaptation and refinement strategies. This can improve the modelճ generalizability based on instructor feedback and provide richer insights into how to support at-risk studentsՠlearning early.
+  In addition to the above, future research may improve the generalizability and performance of the RNN-Attention-KD model using the multi-teacher models. Each teacher model has specific knowledge of each studentճ learning log data, such as reading behaviors, course assessment, and assignment data. This will make the prediction performance of the prediction model more robust.
+Acknowledgments
+This work was supported by JST CREST Grant Number JPMJCR22D1 and JSPS KAKENHI Grant Number JP22H00551, Japan.
+A	Supplementary Materials
+The code written to produce the results reported in this study is publicly available at: https://github.com/limu-research/2025-SACRNN-Attention-KD. This enables other researchers to more easily adopt or adapt our methods.
+References
+[1] Malak Abdullah, Mahmoud Al-Ayyoub, Farah Shatnawi, Saif Rawashdeh, and Rob Abbott. 2023. Predicting studentsՠacademic performance using e-learning logs. IAES International Journal of Artificial Intelligence (IJ-AI) 12 (06 2023), 831. https://doi.org/10.11591/ijai.v12.i2.pp831-839
+[2] Fatima Ahmed Al-azazi and Mossa Ghurab. 2023. ANN-LSTM: A deep learning model for early student performance prediction in MOOC. Heliyon 9, 4 (4 2023), e15382. https://doi.org/10.1016/j.heliyon.2023.e15382
+[3] Balqis Albreiki, Tetiana Habuza, and Nazar Zaki. 2023. Extracting topological features to identify at-risk students using machine learning and graph convolutional network models. International Journal of Educational Technology in Higher
+	Education 20, 1 (04 2023), 1в2.	https://doi.org/10.1186/s41239-023-00389-3
+[4] Dzmitry Bahdanau, Kyunghyun Cho, and Yoshua Bengio. 2015. Neural Machine Translation by Jointly Learning to Align and Translate. In 3rd International Conference on Learning Representations, ICLR 2015, May 7-9, 2015, Conference Track Proceedings. Cornell University, San Diego, CA, USA, 15 pages. http:
+//arxiv.org/abs/1409.0473
+[5] Brijesh Kumar Baradwaj and Saurabh Pal. 2011. Mining Educational Data to Analyze Students Performance. International Journal of Advanced Computer Science and Applications 2, 6 (2011), 7 pages. https://doi.org/10.14569/IJACSA.
+2011.020609
+[6] Yoshua Bengio, Patrice Y. Simard, and Paolo Frasconi. 1994. Learning long-term dependencies with gradient descent is difficult. IEEE Transactions on Neural Networks 5, 2 (3 1994), 157б66. https://doi.org/10.1109/72.279181
+[7] Gabriella Casalino, Giovanna Castellano, Andrea Mannavola, and Gennaro Vessio. 2020. Educational Stream Data Analysis: A Case Study. In 2020 IEEE 20th Mediterranean Electrotechnical Conference ( MELECON). IEEE, New York, NY,
+USA, 232в37. https://doi.org/10.1109/MELECON48756.2020.9140510
+[8] Cheng-Huan Chen, Stephen J. H. Yang, Jian-Xuan Weng, Hiroaki Ogata, and Chien-Yuan Su. 2021. Predicting at-risk university students based on their e-book reading behaviours by using machine learning classifiers. Australasian Journal of
+Educational Technology 37, 4 (6 2021), 130б44. https://doi.org/10.14742/ajet.6116
+[9] Fu Chen and Ying Cui. 2020. Utilizing Student Time Series Behaviour in Learning Management Systems for Early Prediction of Course Performance. Journal of
+	Learning Analytics 7, 2 (Sep. 2020), 1б7.	https://doi.org/10.18608/jla.2020.72.1
+[10] Guobin Chen, Wongun Choi, Xiang Yu, Tony Han, and Manmohan Chandraker. 2017. Learning Efficient Object Detection Models with Knowledge Distillation, In Advances in Neural Information Processing Systems, Isabelle Guyon, Ulrike von Luxburg, Samy Bengio, Hanna M. Wallach, Rob Fergus, S. V. N.
+Vishwanathan, and Roman Garnett (Eds.). Neural Information Processing Systems 30, 742з51. https://proceedings.neurips.cc/paper_files/paper/2017/file/ e1e32e235eee1f970470a3a6658dfdd5-Paper.pdf
+[11] Kyunghyun Cho, Bart van Merrinboer, Caglar Gulcehre, Dzmitry Bahdanau, Fethi Bougares, Holger Schwenk, and Yoshua Bengio. 2014. Learning Phrase Representations using RNN EncoderЄecoder for Statistical Machine Translation. In 2014 Conference on Empirical Methods in Natural Language Processing, Alessandro
+Moschitti, Bo Pang, and Walter Daelemans (Eds.). Association for Computational
+Linguistics, PA, USA, 1724б734. https://doi.org/10.3115/v1/D14-1179
+[12] Ouafae El Aissaoui, Yasser El Alami El Madani, Lahcen Oughdir, Ahmed Dakkak, and Youssouf El Allioui. 2020. A Multiple Linear Regression-Based Approach to Predict Student Performance. In Advanced Intelligent Systems for Sustainable Development (AI2SDղ019). Springer International Publishing, Cham, 9в3. https: //doi.org/10.1007/978-3-030-36653-7_2
+[13] Jo Shan Fu. 2013. ICT in education: A critical literature review and its implications. International Journal of Education and Development Using Information and Communication Technology (IJEDICT) 9, 1 (01 2013), 112б25. https:
+//files.eric.ed.gov/fulltext/EJ1182651.pdf
+[14] Filippos Giannakas, Christos Troussas, Ioannis Voyiatzis, and Cleo Sgouropoulou. 2021. A deep learning classification framework for early prediction of teambased academic performance. Applied Soft Computing 106 (7 2021), 107355.
+https://doi.org/10.1016/j.asoc.2021.107355
+[15] Yann Ling Goh, Yeh Huann Goh, Chun-Chieh Yip, Chen Hunt Ting, Kah Pin Chen, and Raymond Ling Leh Bin. 2020. Prediction of StudentsՠAcademic Performance by K-Means Clustering. International Journal of Advanced Science and Technology
+	29, 10s (4 2020), 1ж.	https://doi.org/10.31580/sps.v2i1.1205
+[16] Jianping Gou, Baosheng Yu, Stephen J. Maybank, and Dacheng Tao. 2021. Knowledge Distillation: A Survey. International Journal of Computer Vision 129, 6 (March 2021), 1789б819. https://doi.org/10.1007/s11263-021-01453-z
+[17] Leena H. Alamri, Ranim S. Almuslim, Mona S. Alotibi, Dana K. Alkadi, Irfan Ullah Khan, and Nida Aslam. 2021. Predicting Student Academic Performance using Support Vector Machine and Random Forest. In Proceedings of the 2020 3rd International Conference on Education Technology Management (London, United Kingdom). Association for Computing Machinery, New York, NY, USA, 100б07. https://doi.org/10.1145/3446590.3446607
+[18] Yanbai He, Rui Chen, Xinya Li, Chuanyan Hao, Sijiang Liu, Gangyao Zhang, and Bo Jiang. 2020. Online At-Risk Student Identification using RNN-GRU Joint Neural Networks. Information 11, 10 (10 2020), 474. https://doi.org/10.3390/ info11100474
+[19] Arto Hellas, Petri Ihantola, Andrew Petersen, Vangel V. Ajanovski, Mirela Gutica,
+Timo Hynninen, Antti Knutas, Juho Leinonen, Chris Messom, and Soohyun Nam Liao. 2018. Predicting academic performance: a systematic literature review. In Proceedings Companion of the 23rd Annual ACM Conference on Innovation and Technology in Computer Science Education (ITiCSE 2018 Companion), Guido Rling and Bruce Scharlau (Eds.). Association for Computing Machinery, New York, NY, USA, 175б99. https://doi.org/10.1145/3293881.3295783
+[20] Geoffrey Hinton, Oriol Vinyals, and Jeff Dean. 2015. Distilling the Knowledge in a Neural Network.	https://doi.org/10.48550/arxiv.1503.02531
+[21] Sepp Hochreiter and Jrgen Schmidhuber. 1997. Long Short-Term Memory. Neural Computation 9, 8 (11 1997), 1735б780. https://doi.org/10.1162/neco.1997.
+9.8.1735
+[22] Ya-Han Hu, Chia-Lun Lo, and Sheng-Pao Shih. 2014. Developing early warning systems to predict studentsՠonline learning performance. Computers in Human Behavior 36 (7 2014), 469д78.	https://doi.org/10.1016/j.chb.2014.04.002
+[23] Mushtaq Hussain, Wenhao Zhu, Wu Zhang, and Syed Muhammad Raza Abidi. 2018. Student Engagement Predictions in an e-Learning System and Their Impact on Student Course Assessment Scores. Computational Intelligence and Neuroscience 2018, 1 (10 2018), 6347186. https://doi.org/10.1155/2018/6347186
+[24] Xiaoqi Jiao, Yichun Yin, Lifeng Shang, Xin Jiang, Xiao Chen, Linlin Li, Fang Wang, and Qun Liu. 2020. TinyBERT: Distilling BERT for Natural Language Understanding. In Findings of the Association for Computational Linguistics: EMNLP 2020, Trevor Cohn, Yulan He, and Yang Liu (Eds.). Association for Computational Linguistics, Online, 4163д174. https://doi.org/10.18653/v1/2020.findings-emnlp.372
+[25] Byung-Hak Kim, Ethan Vizitei, and Varun Ganapathi. 2018. GritNet: Student Performance Prediction with Deep Learning.. In EDM, Kristy Elizabeth Boyer and
+Michael Yudelson (Eds.). International Educational Data Mining Society (IEDMS), USA, 5 pages. https://doi.org/10.48550/arxiv.1804.07405
+[26] Charles Koutcheme, Sami Sarsa, Arto Hellas, Lassi Haaranen, and Juho Leinonen. 2022. Methodological Considerations for Predicting At-risk Students. In Proceedings of the 24th Australasian Computing Education Conference (ACE ղ2), Judy Sheard and Paul Denny (Eds.). Association for Computing Machinery, New York,
+NY, USA, 105б13. https://doi.org/10.1145/3511861.3511873
+[27] Sukrit Leelaluk, Tsubasa Minematsu, Yuta Taniguchi, Fumiya Okubo, and Atsushi Shimada. 2022. Predicting student performance based on Lecture Materials data using Neural Network Models. CEUR Workshop Proceedings 3120 (2022), 11в0. https://ceur-ws.org/Vol-3120/paper2.pdf
+[28] Erwin D. Lopez Z, Tsubasa Minematsu, Yuta Taniguchi, Fumiya Okubo, and Atsushi Shimada. 2022. Assessment of At-Risk StudentsՠPredictions From e-
+Book Activities Representations in Practical Applications. In 30th International Conference on Computers in Education, ICCE 2022 - Proceedings. Asia-Pacific Society for Computers in Education, Taiwan, 279в88. https://icce2022.apsce. net/uploads/P1_C3_42.pdf
+[29] Thang Luong, Hieu Pham, and Christopher D. Manning. 2015. Effective Approaches to Attention-based Neural Machine Translation, In Proceedings of the 2015 Conference on Empirical Methods in Natural Language Processing, Llus Mrquez, Chris Callison-Burch, Jian Su, Daniele Pighin, and Yuval Marton (Eds.). Proceedings of the 2021 Conference on Empirical Methods in Natural Language
+    Processing abs/1508.04025, 1412б421. https://doi.org/10.18653/v1/D15-1166 [30] Nur Izzati Mohd Talib, Nazatul Aini Abd Majid, and Shahnorbanun Sahran. 2023.
+Identification of Student Behavioral Patterns in Higher Education Using K-Means Clustering and Support Vector Machine. Applied Sciences 13, 5 (3 2023), 3267. https://doi.org/10.3390/app13053267
+[31] Ryusuke Murata, Fumiya Okubo, Tsubasa Minematsu, Yuta Taniguchi, and Atsushi Shimada. 2023. Recurrent Neural Network-FitNets: Improving Early Prediction of Student Performanceby Time-Series Knowledge Distillation. Journal of Educational Computing Research 61, 3 (6 2023), 639ж70.	https://doi.org/10. 1177/07356331221129765
+[32] Hiroaki Ogata, Chengjiu Yin, Misato Oi, Fumiya Okubo, Atsushi Shimada, Kentaro Kojima, and Masanori Yamada. 2015. E-book-based learning analytics in University education. In Proceedings of the 23rd International Conference on Computers in Education, ICCE 2015. Asia-Pacific Society for Computers in Education, Taiwan, 401д06. https://mark-lab.net/wp-content/uploads/2012/06/Ogata_et_ al_ICCE2015_1.pdf
+[33] Fumiya Okubo, Takayoshi Yamashita, Atsushi Shimada, and Shinթchi Konomi. 2017. Studentsՠperformance prediction using data of multiple courses by recurrent neural network. In Proceedings of the 25th International Conference on Computers in Education, ICCE 2017 - Main Conference Proceedings. Asia-Pacific Society for Computers in Education, Taiwan, 439Р444. https://kyushu-u.pure.elsevier.com/en/publications/students-performanceprediction-using-data-of-multiple-courses-by
+[34] Fumiya Okubo, Takayoshi Yamashita, Atsushi Shimada, and Hiroaki Ogata. 2017. A neural network approach for studentsՠperformance prediction. In Proceedings of the Seventh International Learning Analytics & Knowledge Conference, Marek Hatala, Alyssa Wis, Phil Winne, Grace Lynch, Xavier Ochoa, Inge Molenaar, Shane Dawson, Shady Shehata, and Jennifer Pei-Ling Tan (Eds.). ACM, New York,
+NY, USA, 598е99. https://doi.org/10.1145/3027385.3029479
+[35] Fumiya Okubo, Takayoshi Yamashita, Atsushi Shimada, Yuta Taniguchi, and Konomi Shinթchi. 2018. On the prediction of studentsՠquiz score by recurrent neural network. CEUR Workshop Proceedings 2163 (2018), 6 pages. https://ceurws.org/Vol-2163/paper3.pdf
+[36] Feiyue Qiu, Guodao Zhang, Xin Sheng, Lei Jiang, Lijia Zhu, Qifeng Xiang, Bo Jiang, and Ping-Kuo Chen. 2022. Predicting studentsՠperformance in e-learning using learning process and behaviour data. Scientific Reports 12, 1 (01 2022). https://doi.org/10.1038/s41598-021-03867-8
+[37] Moises Riestra-Gonzlez, Maria del Puerto Paule-Ruz, and Francisco Ortin. 2021. Massive LMS log data analysis for the early prediction of course-agnostic student performance. Computers & Education 163 (4 2021), 104108. https://doi.org/10.
+1016/j.compedu.2020.104108
+[38] Adriana Romero, Nicolas Ballas, Samira Ebrahimi Kahou, Antoine Chassang, Carlo Gatta, and Yoshua Bengio. 2015. FitNets: Hints for Thin Deep Nets. arXiv:1412.6550 [cs.LG] https://arxiv.org/abs/1412.6550
+[39] T M Noviyanti Sagala, Syarifah Diana Permai, Alexander Agung Santoso Gunawan, Rehnianty Octora Barus, and Cito Meriko. 2022. Predicting Computer Science Studentճ Performance using Logistic Regression. In 2022 5th International
+Seminar on Research of Information Technology and Intelligent Systems (ISRITI). IEEE, New York, NY, USA, 817и21. https://doi.org/10.1109/ISRITI56927.2022. 10052968
+[40] Sungho Shin, Joosoon Lee, Junseok Lee, Yeonguk Yu, and Kyoobin Lee. 2022.
+Teaching Where to Look: Attention Similarity Knowledge Distillation for Low Resolution Face Recognition, In Computer Vision РECCV 2022, Shai Avidan,
+Gabriel J. Brostow, Moustapha Ciss, Giovanni Maria Farinella, and Tal Hassner
+	(Eds.). European Conference on Computer Vision 13672, 631ж47.	https://doi.org/
+10.48550/arxiv.2209.14498
+[41] Ilya Sutskever, Oriol Vinyals, and Quoc V. Le. 2014. Sequence to sequence learning with neural networks. In Proceedings of the 27th International Conference on Neural Information Processing Systems - Volume 2 (Montreal, Canada) (NIPSձ4, Vol. abs/1409.3215), Zoubin Ghahramani, Max Welling, Corinna Cortes, Neil D.
+Lawrence, and Kilian Q. Weinberger (Eds.). MIT Press, Cambridge, MA, USA, 3104г112. https://doi.org/10.48550/arxiv.1409.3215
+[42] Luis Vives, Ivan Cabezas, Juan Carlos Vives, Nilton German Reyes, Janet Aquino, Jose Bautista Cndor, and S. Francisco Segura Altamirano. 2024. Prediction of StudentsՠAcademic Performance in the Programming Fundamentals Course
+Using Long Short-Term Memory Neural Networks. IEEE Access 12 (2024), 5882Р5898. https://doi.org/10.1109/ACCESS.2024.3350169
+[43] Valdemar ?vbensk?, Kristin Tk?ik, Aubrey Birdwell, Richard Weiss, Ryan S. Baker, Pavel ?eleda, Jan Vykopal, Jens Mache, and Ankur Chattopadhyay. 2024.
+Detecting Unsuccessful Students in Cybersecurity Exercises in Two Different Learning Environments. In Proceedings of the 54th Frontiers in Education Conference (FIE ղ4). IEEE, New York, NY, USA, 9 pages. https://arxiv.org/pdf/2408.08531
+[44] Hajra Waheed, Saeed-Ul Hassan, Raheel Nawaz, Naif R. Aljohani, Guanliang Chen, and Dragan Gasevic. 2023. Early prediction of learners at risk in self-paced education: A neural network approach. Expert Systems with Applications 213 (3
+	2023), 118868.	https://doi.org/10.1016/j.eswa.2022.118868
+[45] Kai Wang, Fei Yang, and Joost van de Weijer. 2022. Attention Distillation: selfsupervised vision transformer students need more guidance.. In BMVC. BMVA Press, UK, 26 pages. https://doi.org/10.48550/arxiv.2210.00944
+[46] Wenhui Wang, Hangbo Bao, Shaohan Huang, Li Dong, and Furu Wei. 2021.
+MiniLMv2: Multi-Head Self-Attention Relation Distillation for Compressing Pretrained Transformers. In Findings of the Association for Computational Linguistics: ACL-IJCNLP 2021, Chengqing Zong, Fei Xia, Wenjie Li, and Roberto Navigli (Eds.). Association for Computational Linguistics, PA, USA, 2140в151. https://doi.org/10.18653/v1/2021.findings-acl.188
+[47] Xing Wei, Yuqing Liu, Jiajia Li, Huiyong Chu, Zichen Zhang, Feng Tan, and Pengwei Hu. 2022. B-AT-KD: Binary attention map knowledge distillation. Neurocomputing 511 (9 2022), 299г07. https://doi.org/10.1016/j.neucom.2022.09.064
+[48] Jacob Whitehill, Kiran Mohan, Daniel Seaton, Yigal Rosen, and Dustin Tingley.
+	2017. Delving Deeper into MOOC Student Dropout Prediction.	https://doi.org/
+10.48550/arxiv.1702.06404 arXiv:1702.06404 [cs.AI]
+[49] Mariana Windarti and Putri Taqwa Prasetyaninrum. 2020. Prediction Analysis Student Graduate Using Multilayer Perceptron. In Proceedings of the International
+Conference on Online and Blended Learning 2019 (ICOBL 2019). Atlantis Press,
+Paris, France, 5 pages. https://doi.org/10.2991/assehr.k.200521.011
+[50] Yue Xie, Ruiyu Liang, Zhenlin Liang, Chengwei Huang, Cairong Zou, and Bjrn Schuller. 2019. Speech Emotion Classification Using Attention-Based LSTM.
+IEEE/ACM Transactions on Audio, Speech, and Language Processing 27, 11 (7 2019), 1675б685. https://doi.org/10.1109/TASLP.2019.2925934
+[51] Sergey Zagoruyko and Nikos Komodakis. 2017. Paying More Attention to Attention: Improving the Performance of Convolutional Neural Networks via Attention Transfer. In ICLR. OpenReview.net, Online, 13 pages. https://arxiv.org/abs/1612. 03928
+[52] Yupei Zhang, Yue Yun, Rui An, Jiaqi Cui, Huan Dai, and Xuequn Shang. 2021.
+Educational Data Mining Techniques for Student Performance Prediction: Method Review and Comparison Analysis. Frontiers in Psychology 12 (12 2021), 19 pages.
+https://doi.org/10.3389/fpsyg.2021.698490
+Knowledge Distillation in RNN-Attention Models...	SAC ղ5, March 31-April 4, 2025, Catania, Italy
+  
+SAC ղ5, March 31-April 4, 2025, Catania, Italy	S. Leelaluk et al.
+  
+64
+  
+64
+  
+
+  
+64
+  

@@ -1,0 +1,25 @@
+plugins {
+    id 'java'
+    id 'jacoco'
+}
+
+dependencies {
+    implementation project(':common')
+    // Add any specific dependencies for the training module here
+}
+
+jacoco {
+    toolVersion = "0.8.11"
+}
+
+test {
+    finalizedBy jacocoTestReport
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}
