@@ -1,54 +1,52 @@
 package edu.odu.cs.cs350;
 
 import java.io.File;
-
+import java.io.*;
+import java.nio.file.*;
 /**
  * Classifier class that can retrieve file paths from command-line arguments.
  * Story 49: Classifier class to retrieve file path from the CLI.
  */
+
+
 public class Classifier {
-    
-    private String filePath;
-    
-    /**
-     * Sets the file path from command-line arguments.
-     * Uses the first argument as the file path.
-     * 
-     * @param args command-line arguments
-     * @throws IllegalArgumentException if args is null or empty
-     */
-    public void setFilePathFromCLI(String[] args) {
-        if (args == null) {
-            throw new IllegalArgumentException("Arguments cannot be null");
-        }
-        if (args.length == 0) {
-            throw new IllegalArgumentException("Arguments cannot be empty");
-        }
-        this.filePath = args[0];
-    }
-    
-    /**
-     * Gets the file path that was set from CLI.
-     * 
-     * @return the file path string
-     */
-    public String getFilePath() {
-        return filePath;
-    }
-    
-    /**
-     * Gets a File object for the stored file path.
-     * 
-     * @return File object representing the file path
-     */
-    public File getFile() {
-        if (filePath == null) {
-            return null;
-        }
-        return new File(filePath);
-    }
 
     public static void main(String[] args) {
-        
+        if (args.length < 1) {
+            System.err.println("Usage: java -jar classifier.jar <file1> <file2> ...");
+            System.exit(1);
+        }
+
+        // Load embedded model from the JAR's resources
+        InputStream modelStream = Classifier.class.getResourceAsStream("/model.dat");
+        if (modelStream == null) {
+            System.err.println("❌ Embedded model not found inside classifier.jar");
+            System.exit(1);
+        }
+
+        LearningMachine machine = LearningMachine.loadFromStream(modelStream);
+
+        for (String filePath : args) {
+            try {
+                String text = Files.readString(Paths.get(filePath));
+                String fileName = Paths.get(filePath).getFileName().toString();
+
+                // Create Document (no category since it’s to be predicted)
+                Document doc = new Document("", fileName, text);
+
+                // Classify and print result
+                String predictedClass = machine.classify(doc);
+                System.out.println(fileName + ": " + predictedClass);
+            } catch (IOException e) {
+                logError("Error reading file " + filePath + ": " + e.getMessage());
+            }
+        }
+    }
+
+    private static void logError(String message) {
+        try (FileWriter fw = new FileWriter("classifier.log", true)) {
+            fw.write(message + "\n");
+        } catch (IOException ignored) {
+        }
     }
 }

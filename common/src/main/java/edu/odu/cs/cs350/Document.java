@@ -1,66 +1,71 @@
 package edu.odu.cs.cs350;
 
 import java.io.File;
+import java.io.Serializable;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 /**
  * Represents a document that can be received from the Classifier.
  * Documents can be pre-classified or post-classified.
  */
-public class Document {
-    
-    private File file;
-    private boolean classified;
-    
-    /**
-     * Creates a Document with the given file.
-     * Defaults to post-classified (not yet classified).
-     * 
-     * @param file the document file
-     * @throws IllegalArgumentException if file is null
-     */
-    public Document(File file) {
-        this(file, false);
+
+public class Document implements Serializable {
+    private static final long serialVersionUID = 1L;
+
+    private final String filePath;    // full or relative path to the file
+    private final String name;        // file name only (no path)
+    private String category;          // nullable: known for training, null for classification
+    private final String text;        // file contents (may be empty)
+
+    // Constructor for labeled doc
+    public Document(String category, String filePath, String text) {
+        this.filePath = filePath;
+        this.name = extractName(filePath);
+        this.category = category;
+        this.text = (text == null) ? "" : text;
     }
-    
-    /**
-     * Creates a Document with the given file and classification status.
-     * 
-     * @param file the document file
-     * @param classified true if pre-classified, false if post-classified
-     * @throws IllegalArgumentException if file is null
-     */
-    public Document(File file, boolean classified) {
-        if (file == null) {
-            throw new IllegalArgumentException("File cannot be null");
+
+    // Constructor for unlabeled doc
+    public Document(String filePath, String text) {
+        this(null, filePath, text);
+    }
+
+    private static String extractName(String path) {
+        try {
+            Path p = Paths.get(path);
+            return p.getFileName().toString();
+        } catch (Exception e) {
+            // fallback
+            int idx = path.lastIndexOf('/');
+            if (idx == -1) idx = path.lastIndexOf('\\');
+            return (idx == -1) ? path : path.substring(idx + 1);
         }
-        this.file = file;
-        this.classified = classified;
     }
-    
-    /**
-     * Gets the document file.
-     * 
-     * @return the file
-     */
-    public File getFile() {
-        return file;
+
+    public String getFilePath() {
+        return filePath;
     }
-    
-    /**
-     * Checks if the document is classified.
-     * 
-     * @return true if pre-classified, false if post-classified
-     */
-    public boolean isClassified() {
-        return classified;
+
+    public String getName() {
+        return name;
     }
-    
-    /**
-     * Sets the classification status.
-     * 
-     * @param classified the new classification status
-     */
-    public void setClassified(boolean classified) {
-        this.classified = classified;
+
+    public String getCategory() {
+        return category;
+    }
+
+    // Used by classifier to assign predicted category
+    public void setCategory(String category) {
+        this.category = category;
+    }
+
+    public String getText() {
+        return text;
+    }
+
+    @Override
+    public String toString() {
+        return "Document[name=" + name + ", category=" + category + "]";
     }
 }
